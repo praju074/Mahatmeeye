@@ -1,2 +1,316 @@
-# Mahatmeeye
-chatboat
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mahatma Eye Hospital Chatbot</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<style>
+:root{
+  --primary:#0366d6; --accent:#004a9f; --bg:#f3f7fb;
+  --card:#ffffff; --muted:#6b7280; --success:#16a34a;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:Inter,Segoe UI,Roboto,system-ui,-apple-system,Helvetica,Arial;background:var(--bg);color:#0b1220}
+.page{display:flex;gap:24px;padding:24px;min-height:100vh}
+.preview{flex:0 0 420px;background:var(--card);border-radius:12px;box-shadow:0 12px 36px rgba(2,6,23,0.12);display:flex;flex-direction:column;overflow:hidden}
+.chat-header{display:flex;align-items:center;gap:12px;padding:12px 16px;background:linear-gradient(90deg,var(--primary),var(--accent));color:#fff}
+.chat-header h3{margin:0;font-size:16px}
+.lang-bar{display:flex;align-items:center;gap:8px;padding:10px;background:#fafafa;border-bottom:1px solid #eee}
+.messages{flex:1;overflow:auto;padding:12px;display:flex;flex-direction:column;gap:8px;background:linear-gradient(180deg,#fbfdff,#f0f7ff)}
+.msg{max-width:78%;padding:10px 14px;border-radius:14px;line-height:1.35;font-size:14px;word-break:break-word}
+.bot{align-self:flex-start;background:#f1f5f9;color:#0f1720}
+.user{align-self:flex-end;background:var(--primary);color:#fff}
+.timestamp{display:block;font-size:11px;color:var(--muted);margin-top:6px}
+.quick{display:flex;flex-wrap:wrap;padding:10px 12px;gap:8px;background:#fff;border-top:1px solid #eee}
+.chip{background:#f3f4f6;padding:8px 12px;border-radius:999px;border:none;cursor:pointer}
+.input-row{display:flex;padding:12px;border-top:1px solid #eee;background:#fff;gap:8px}
+textarea{flex:1;padding:10px;border-radius:10px;border:1px solid #ddd;resize:none;height:50px}
+button.btn{background:var(--primary);color:#fff;padding:10px 14px;border-radius:10px;border:none;cursor:pointer}
+button.secondary{background:#eef2ff;color:var(--primary);border:1px solid rgba(3,102,214,0.12)}
+small.muted{color:var(--muted);font-size:12px}
+.panel{flex:1;display:flex;flex-direction:column;gap:12px}
+.card{background:#fff;padding:12px;border-radius:10px;box-shadow:0 6px 18px rgba(2,6,23,0.06)}
+.panel .head{display:flex;align-items:center;justify-content:space-between;padding:8px}
+.slot-grid{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.slot{padding:8px 10px;border-radius:8px;border:1px solid #e6eefc;cursor:pointer}
+.slot.selected{background:var(--primary);color:#fff;border-color:var(--primary)}
+#modalRoot{display:none;position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:9999}
+@media(max-width:960px){.page{flex-direction:column}.preview{width:100%}}
+</style>
+</head>
+<body>
+
+<div class="page">
+  <!-- Chatbot Preview -->
+  <div class="preview">
+    <div class="chat-header">
+      <div style="display:flex;align-items:center;gap:10px">
+        <h3>Mahatma Eye Hospital</h3>
+      </div>
+      <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+        <button class="chip" id="voiceBtn">🎤 Voice</button>
+        <button class="chip" id="ttsBtn">🔊 Read</button>
+      </div>
+    </div>
+
+    <div class="lang-bar">
+      <label class="muted" for="lang">Language</label>
+      <select id="lang">
+        <option value="en">English</option>
+        <option value="hi">हिन्दी</option>
+        <option value="mr">मराठी</option>
+      </select>
+      <div style="flex:1"></div>
+      <small class="muted">Tip: Try "appointments"</small>
+    </div>
+
+    <div class="messages" id="messages"></div>
+
+    <div class="quick" id="quickReplies">
+      <button class="chip" data-topic="services">Services</button>
+      <button class="chip" data-topic="doctors">Doctors</button>
+      <button class="chip" data-topic="appointments">Appointments</button>
+      <button class="chip" data-topic="emergency">Emergency</button>
+      <button class="chip" data-topic="contact">Contact</button>
+    </div>
+
+    <div class="input-row">
+      <textarea id="userInput" placeholder="Type your question or 'appointments'..."></textarea>
+      <button class="btn" id="sendBtn">Send</button>
+    </div>
+  </div>
+
+  <!-- Admin Panel -->
+  <div class="panel">
+    <div class="card">
+      <div class="head">
+        <div>
+          <strong>Admin / Patient History (Preview)</strong><br>
+          <small class="muted">Admin: <strong>admin</strong> / 1234</small>
+        </div>
+        <div>
+          <button class="btn secondary" id="openAdminBtn">Open Admin</button>
+          <button class="btn secondary" id="openHistoryBtn">Open History</button>
+        </div>
+      </div>
+      <div style="display:flex;gap:12px;margin-top:10px">
+        <div style="flex:1">
+          <label class="muted">Quick Stats</label>
+          <div style="margin-top:6px">
+            <div id="totalCount">Appointments: 0</div>
+            <div id="uniquePatients">Unique Patients: 0</div>
+          </div>
+        </div>
+        <div style="flex:1">
+          <label class="muted">Search</label>
+          <div style="display:flex;gap:8px;margin-top:6px">
+            <input id="searchBox" placeholder="search by name / phone / id" style="flex:1;padding:8px;border-radius:8px;border:1px solid #ddd">
+            <button class="btn" id="searchBtn">Search</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="recentCard">
+      <strong>Recent Appointments</strong>
+      <div id="recentList" style="margin-top:8px"></div>
+    </div>
+  </div>
+</div>
+
+<div id="modalRoot"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script>
+const messages = document.getElementById('messages');
+const userInput = document.getElementById('userInput');
+const sendBtn = document.getElementById('sendBtn');
+const lang = document.getElementById('lang');
+const quickReplies = document.getElementById('quickReplies');
+const voiceBtn = document.getElementById('voiceBtn');
+const ttsBtn = document.getElementById('ttsBtn');
+const modalRoot = document.getElementById('modalRoot');
+const recentList = document.getElementById('recentList');
+const totalCountElem = document.getElementById('totalCount');
+const uniquePatientsElem = document.getElementById('uniquePatients');
+
+const DB_KEY='meh_chatbot_preview_v2';
+const BASE_SLOTS=['09:00','09:30','10:00','11:00','14:00','14:30','15:30','16:30'];
+
+// Multi-step appointment state
+let state={active:false,step:0,data:{}};
+
+// Messages
+function appendMsg(text,cls='bot'){ 
+  const el=document.createElement('div'); 
+  el.className='msg '+cls;
+  el.innerHTML=text.replace(/\n/g,'<br/>');
+  const ts=document.createElement('div'); ts.className='timestamp'; ts.textContent=new Date().toLocaleTimeString();
+  el.appendChild(ts); messages.appendChild(el); messages.scrollTop=messages.scrollHeight;
+}
+
+// Storage
+function readAll(){ return JSON.parse(localStorage.getItem(DB_KEY)||'[]'); }
+function saveAppointment(obj){
+  const all=readAll();
+  const dup=all.find(a=>a.phone===obj.phone && a.date===obj.date && a.slot===obj.slot);
+  if(dup) throw new Error('duplicate');
+  all.push(obj); localStorage.setItem(DB_KEY,JSON.stringify(all));
+}
+function updateStats(){
+  const all=readAll(); totalCountElem.textContent='Appointments: '+all.length;
+  const unique=[...new Set(all.map(a=>a.phone))]; uniquePatientsElem.textContent='Unique Patients: '+unique.length;
+}
+function renderRecent(){
+  const all=readAll().slice(-6).reverse(); recentList.innerHTML='';
+  if(all.length===0){ recentList.innerHTML='<div class="muted">No appointments yet</div>'; return;}
+  all.forEach(a=>{
+    const d=document.createElement('div');
+    d.innerHTML=`<div><strong>${a.name}</strong> <span class="muted">(${a.phone})</span></div><div class="muted">${a.date} ${a.slot} • ${a.specialist} • ID:${a.id}</div>`;
+    recentList.appendChild(d);
+  });
+}
+
+// Smart responses
+const responses=[
+  {keywords:["hello","hi","hey"],response:"Hello! Welcome to Mahatma Eye Hospital. How can I help you?"},
+  {keywords:["service","treatment","procedure"],response:"We offer Outpatient, Eye Surgery, Cataract Treatment, Laser Therapy, Pediatric Eye Care."},
+  {keywords:["doctor","specialist"],response:"We have specialists in Ophthalmology, Retina, Cornea, Glaucoma and Pediatric Eye Care."},
+  {keywords:["appointment","book","schedule"],response:"start_appointment"},
+  {keywords:["emergency","urgent"],response:"In case of eye emergencies, call 911 immediately or visit our emergency department."},
+  {keywords:["contact","phone","email"],response:"Contact: info@mahatmaeyehospital.com or 123-456-7890."}
+];
+
+// Multi-language prompts
+const prompts=[
+  {en:"Please enter your full name:",hi:"कृपया अपना पूरा नाम दर्ज करें:",mr:"कृपया आपले पूर्ण नाव प्रविष्ट करा:"},
+  {en:"Phone number (10 digits):",hi:"फोन नंबर (10 अंक):",mr:"फोन नंबर (10 अंक):"},
+  {en:"Which specialist? (Retina, Glaucoma, General):",hi:"किस विशेषज्ञ से? (Retina, Glaucoma, General):",mr:"कोणत्या तज्ञाला भेट घ्यायची? (Retina, Glaucoma, General):"},
+  {en:"Choose preferred date:",hi:"अपनी पसंदीदा तारीख चुनें:",mr:"पसंदीची तारीख निवडा:"}
+];
+
+function handleAppointmentInput(text){
+  const step=state.step;
+  if(step===0){state.data.name=text; state.step++; return prompts[1][lang.value];}
+  if(step===1){
+    const digits=text.replace(/\D/g,''); if(digits.length!==10) return "Please enter a valid 10-digit phone number.";
+    state.data.phone=digits; state.step++; return prompts[2][lang.value];
+  }
+  if(step===2){state.data.specialist=text; state.step++; setTimeout(openDatePicker,250); return "Opening date picker...";}
+  return '';
+}
+
+function getResponse(text){
+  if(state.active) return handleAppointmentInput(text);
+  const q=text.toLowerCase();
+  for(const r of responses){
+    if(r.keywords.some(k=>q.includes(k))){
+      if(r.response==='start_appointment'){state.active=true; state.step=0; state.data={}; return prompts[0][lang.value];}
+      return r.response;
+    }
+  }
+  return "Sorry, I didn't understand. Try 'appointments' or 'services'.";
+}
+
+// Send handler
+function sendMessage(){
+  const txt=userInput.value.trim(); if(!txt) return;
+  appendMsg(txt,'user'); userInput.value=''; userInput.style.height='50px';
+  setTimeout(()=>{ appendMsg(getResponse(txt),'bot'); },300);
+}
+
+// Quick replies
+quickReplies.addEventListener('click',e=>{ if(e.target.dataset.topic){ userInput.value=e.target.dataset.topic; sendMessage(); }});
+sendBtn.addEventListener('click',sendMessage);
+userInput.addEventListener('keydown',e=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendMessage(); } });
+userInput.addEventListener('input',e=>{ userInput.style.height='auto'; userInput.style.height=userInput.scrollHeight+'px'; });
+
+// Voice
+let recognition;
+if('webkitSpeechRecognition' in window){
+  recognition=new webkitSpeechRecognition(); recognition.lang='en-US'; recognition.interimResults=false;
+  recognition.onresult=e=>{ userInput.value=e.results[0][0].transcript; sendMessage(); };
+}
+voiceBtn.onclick=()=>{ if(recognition) recognition.start(); };
+
+// TTS
+ttsBtn.onclick=()=>{
+  const last=[...messages.querySelectorAll('.msg.bot')].pop();
+  if(last){ const utt=new SpeechSynthesisUtterance(last.innerText); speechSynthesis.speak(utt);}
+};
+
+// Appointment date picker
+function getSlotsForDate(dateStr,specialty){
+  const date=new Date(dateStr); if(date.getDay()===0) return [];
+  const hash=Array.from(dateStr+(specialty||'')).reduce((s,c)=>s+c.charCodeAt(0),0);
+  return BASE_SLOTS.filter((s,i)=>((i+hash)%7)<6);
+}
+
+function openDatePicker(){
+  modalRoot.innerHTML=''; modalRoot.style.display='block';
+  const wrapper=document.createElement('div'); wrapper.className='card'; wrapper.style.width='420px';
+  wrapper.innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <strong>Select date & slot</strong>
+      <button id="closeModal" class="chip">Close</button>
+    </div>
+    <div style="margin-top:10px">
+      <input id="cal" placeholder="Select date" style="width:100%;padding:8px;border-radius:8px;border:1px solid #ddd"/>
+      <div id="slotArea" style="margin-top:10px"><small class="muted">Choose a date to see slots</small></div>
+      <div style="display:flex;justify-content:flex-end;margin-top:12px">
+        <button id="confirmSlot" class="btn" disabled>Confirm</button>
+      </div>
+    </div>`;
+  modalRoot.appendChild(wrapper);
+
+  document.getElementById('closeModal').onclick=()=>{ modalRoot.style.display='none'; modalRoot.innerHTML=''; state={active:false,step:0,data:{}}; };
+
+  flatpickr('#cal',{minDate:'today',onChange:function(sd,dateStr){
+    const slots=getSlotsForDate(dateStr,state.data.specialist);
+    const slotArea=document.getElementById('slotArea'); slotArea.innerHTML='';
+    if(!slots.length){ slotArea.innerHTML='<div class="muted">No slots available</div>'; return;}
+    const grid=document.createElement('div'); grid.className='slot-grid';
+    slots.forEach(s=>{
+      const b=document.createElement('button'); b.className='slot'; b.textContent=s;
+      b.onclick=()=>{ document.querySelectorAll('.slot').forEach(x=>x.classList.remove('selected')); b.classList.add('selected'); document.getElementById('confirmSlot').disabled=false; document.getElementById('confirmSlot').dataset.slot=s; };
+      grid.appendChild(b);
+    });
+    slotArea.appendChild(grid);
+  }});
+
+  document.getElementById('confirmSlot').onclick=()=>{
+    const cal=document.getElementById('cal'); const date=cal._flatpickr.selectedDates[0];
+    if(!date) return alert('Choose date'); const iso=date.toISOString().slice(0,10);
+    const slot=document.getElementById('confirmSlot').dataset.slot;
+    state.data.date=iso; state.data.slot=slot; state.data.id='MEH-'+Math.floor(Math.random()*90000+10000);
+    state.data.created=new Date().toISOString();
+
+    try{ saveAppointment({...state.data}); } catch(e){ appendMsg('This slot is already booked.','bot'); modalRoot.style.display='none'; state={active:false,step:0,data:{}}; updateStats(); renderRecent(); return; }
+
+    modalRoot.style.display='none'; modalRoot.innerHTML='';
+
+    appendMsg(`✅ Appointment booked!\nName: ${state.data.name}\nPhone: ${state.data.phone}\nSpecialist: ${state.data.specialist}\nDate: ${state.data.date} ${state.data.slot}\nBooking ID: ${state.data.id}`,'bot');
+
+    state={active:false,step:0,data:{}};
+    updateStats(); renderRecent();
+  };
+}
+
+// Admin / history
+document.getElementById('openAdminBtn').onclick=()=>{
+  const user=prompt('Admin username:'); if(user!=='admin'){alert('Invalid'); return;}
+  const pass=prompt('Password:'); if(pass!=='1234'){alert('Invalid'); return;}
+  const all=readAll(); const w=window.open('','_blank');
+  w.document.write('<pre>'+JSON.stringify(all,null,2)+'</pre>'); w.document.close();
+};
+document.getElementById('openHistoryBtn').onclick=()=>{
+  const all=readAll(); alert(JSON.stringify(all.slice(-10),null,2));
+};
+
+// Initial welcome
+appendMsg("Hello! Welcome to Mahatma Eye Hospital. I can help with services, doctors, appointments and more.",'bot');
+updateStats(); renderRecent();
+</script>
+</body>
+</html>
